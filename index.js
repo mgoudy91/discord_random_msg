@@ -64,4 +64,4 @@ const fetchAll = async (channel) => {
   return messageArray;
 };
 
-client.login("TOKEN_HERE");
+client.login(process.env.DISCORD_KEY);
