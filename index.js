@@ -64,4 +64,4 @@ const fetchAll = async (channel) => {
   return messageArray;
 };
 
-client.login("NzAzMzU1OTQyOTIxODMwNDMx.XqNZaw.Vib07ukvtg5TSOtQonVYgkyoQfg");
+client.login("TOKEN_HERE");
