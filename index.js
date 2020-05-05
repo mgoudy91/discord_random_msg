@@ -8,6 +8,7 @@ const client = new Discord.Client();
 
 client.on("ready", () => {
   console.log("Ready for action!");
+  //very important
 });
 
 // Create an event listener for messages
@@ -131,7 +132,8 @@ function generateEmbed (message) {
     .setAuthor(author.username, message.author.avatarURL({dynamic:true}))
     .setDescription(message.cleanContent)
     .setTimestamp(message.createdAt)
-    .setFooter('Sent on');
+    .setFooter('Sent on',
+      'https://media.discordapp.net/attachments/358274019482664961/607715919090810987/obamer_sphere.gif');
 
     return embed;
 }
