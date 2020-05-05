@@ -7,12 +7,16 @@ const Discord = require("discord.js");
 const client = new Discord.Client();
 
 client.on("ready", () => {
-  console.log("I am ready!");
+  console.log("Ready for action!");
+  //very important
 });
 
 // Create an event listener for messages
 client.on("message", (message) => {
   // Filter messages to get an entry point
+  if (message.author.bot){
+    return;
+  }
   if (
     message.content.includes("!random_message") ||
     message.content.includes("!rm")
@@ -60,21 +64,15 @@ const getChannels = (guild, channelName = "") => {
 };
 
 const getRandomMessage = async (sourceChannel, channelToPost) => {
+  channelToPost.startTyping();
   let messages = await fetchAll(sourceChannel);
   console.log(`Picking message at random...`);
   let randomMessageIndex = Math.floor(Math.random() * messages.length);
   let randomMessage = messages[randomMessageIndex];
   console.log(`sending: ${randomMessage.content} to ${channelToPost.name}`);
-
-  channelToPost.send(
-    `Remember when ${
-      randomMessage.author.username
-    } sent this in ${sourceChannel} on ${moment(randomMessage.createdAt).format(
-      "MMMM Do YYYY, at h:mm:ss a"
-    )}`
-  );
-  channelToPost.send(randomMessage || "_no text_");
-  channelToPost.send(randomMessage.url);
+  //Not required, but helps if there are multiple images
+  channelToPost.stopTyping();
+  channelToPost.send(generateEmbed(randomMessage));
 };
 
 const fetchAll = async (channel) => {
@@ -123,5 +121,21 @@ const sendHelp = (channel) => {
 
   channel.send(exampleEmbed);
 };
+
+function generateEmbed (message) {
+  let author = message.author;
+  //TODO: Check for attachments
+  const embed = new Discord.MessageEmbed()
+    .setColor('RANDOM')
+    .setTitle(`#${message.channel.name}`)
+    .setURL(message.url)
+    .setAuthor(author.username, message.author.avatarURL({dynamic:true}))
+    .setDescription(message.cleanContent)
+    .setTimestamp(message.createdAt)
+    .setFooter('Sent on',
+      'https://media.discordapp.net/attachments/358274019482664961/607715919090810987/obamer_sphere.gif');
+
+    return embed;
+}
 
 client.login(process.env.TOKEN);
