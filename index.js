@@ -70,8 +70,13 @@ const getRandomMessage = async (sourceChannel, channelToPost) => {
   let randomMessageIndex = Math.floor(Math.random() * messages.length);
   let randomMessage = messages[randomMessageIndex];
   console.log(`sending: ${randomMessage.content} to ${channelToPost.name}`);
+  // console.log(`Attachments: ${randomMessage.attachments.size}`)
+  // randomMessage.attachments.forEach(attachment=> {
+  //   console.log(`Name: ${attachment.name} URL: ${attachment.url}`);
+  // });
+
   //Not required, but helps if there are multiple images
-  channelToPost.stopTyping();
+  channelToPost.stopTyping(true);
   channelToPost.send(generateEmbed(randomMessage));
 };
 
@@ -124,7 +129,6 @@ const sendHelp = (channel) => {
 
 function generateEmbed (message) {
   let author = message.author;
-  //TODO: Check for attachments
   const embed = new Discord.MessageEmbed()
     .setColor('RANDOM')
     .setTitle(`#${message.channel.name}`)
@@ -135,6 +139,16 @@ function generateEmbed (message) {
     .setFooter('Sent on',
       'https://media.discordapp.net/attachments/358274019482664961/607715919090810987/obamer_sphere.gif');
 
+    //Assume attachments have a higher priority
+    if (message.embeds.length > 0) {
+      var img = message.embeds.find(embed => embed.type === 'image');
+    }
+    if (message.attachments.size > 0){
+      var img = message.attachments.find(attach => attach.url.match(/\.(jpg|jpeg|gif|png|tiff|bmp)$/) != null);
+    }
+    if (img) {
+      embed.setImage(img.url);
+    }
     return embed;
 }
 
