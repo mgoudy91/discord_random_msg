@@ -70,12 +70,8 @@ const getRandomMessage = async (sourceChannel, channelToPost) => {
   let randomMessageIndex = Math.floor(Math.random() * messages.length);
   let randomMessage = messages[randomMessageIndex];
   console.log(`sending: ${randomMessage.content} to ${channelToPost.name}`);
-  // console.log(`Attachments: ${randomMessage.attachments.size}`)
-  // randomMessage.attachments.forEach(attachment=> {
-  //   console.log(`Name: ${attachment.name} URL: ${attachment.url}`);
-  // });
 
-  //Not required, but helps if there are multiple images
+  //Not required, but helps if there are multiple requests/message failure
   channelToPost.stopTyping(true);
   channelToPost.send(generateEmbed(randomMessage));
 };
