@@ -1,9 +1,7 @@
 "use strict";
 require("dotenv").config();
-const moment = require("moment");
-
 const Discord = require("discord.js");
-
+const fs = require("fs");
 const client = new Discord.Client();
 
 client.on("ready", () => {
@@ -14,9 +12,10 @@ client.on("ready", () => {
 // Create an event listener for messages
 client.on("message", (message) => {
   // Filter messages to get an entry point
-  if (message.author.bot){
+  if (message.author.bot) {
     return;
   }
+
   if (
     message.content.includes("!random_message") ||
     message.content.includes("!rm")
@@ -33,6 +32,12 @@ client.on("message", (message) => {
     // Break for help
     if (commandArray.some((command) => command.includes("help"))) {
       sendHelp(message.channel);
+      return;
+    }
+
+    // Break for indexing
+    if (commandArray.some((command) => command.includes("index"))) {
+      downloadHistory(message.guild);
       return;
     }
 
@@ -57,6 +62,33 @@ client.on("message", (message) => {
   }
 });
 
+const downloadHistory = async (guild) => {
+  console.log("Start indexing");
+  let channels = guild.channels.cache.filter(
+    (channel) => channel.type === "text"
+  );
+  channels.forEach(async (channel) => {
+    console.log("indexing: " + channel.name);
+    let messageArray = await fetchAll(channel);
+
+    // Write to file
+    let file = fs.createWriteStream("./message_index/" + channel.name + ".txt");
+    file.on("error", function (err) {
+      console.log(err);
+    });
+    messageArray.forEach(function (message) {
+      let messageObj = JSON.parse(JSON.stringify(message));
+      messageObj.author = message.author;
+      messageObj.embeds = message.embeds;
+      messageObj.attachments = message.attachments;
+      file.write(JSON.stringify(messageObj) + "\n");
+    });
+    file.end();
+
+    console.log("done indexing: " + channel.name);
+  });
+};
+
 const getChannels = (guild, channelName = "") => {
   return guild.channels.cache.filter(
     (channel) => channel.type === "text" && channel.name.includes(channelName)
@@ -65,15 +97,36 @@ const getChannels = (guild, channelName = "") => {
 
 const getRandomMessage = async (sourceChannel, channelToPost) => {
   channelToPost.startTyping();
-  let messages = await fetchAll(sourceChannel);
-  console.log(`Picking message at random...`);
-  let randomMessageIndex = Math.floor(Math.random() * messages.length);
-  let randomMessage = messages[randomMessageIndex];
-  console.log(`sending: ${randomMessage.content} to ${channelToPost.name}`);
 
-  //Not required, but helps if there are multiple requests/message failure
-  channelToPost.stopTyping(true);
-  channelToPost.send(generateEmbed(randomMessage));
+  let fileName = `./message_index/${sourceChannel.name}.txt`;
+
+  // First choice: fetch from file
+  if (fs.existsSync(fileName)) {
+    console.log(`We have a file for ${sourceChannel.name}`);
+    let messages = fs.readFileSync(fileName).toString().split("\n");
+    console.log(`Picking message at random...`);
+    let randomMessageIndex = Math.floor(Math.random() * messages.length) -1;
+    console.log(`random is`+ randomMessageIndex);
+
+    // need to parse
+    let randomMessage = JSON.parse(messages[randomMessageIndex]);
+    console.log(`sending: ${randomMessage.content} to ${channelToPost.name}`);
+
+    //Not required, but helps if there are multiple requests/message failure
+    channelToPost.stopTyping(true);
+    channelToPost.send(generateEmbed(randomMessage, sourceChannel));
+  } else {
+    // Fallback, fetch now
+    let messages = await fetchAll(sourceChannel);
+    console.log(`Picking message at random...`);
+    let randomMessageIndex = Math.floor(Math.random() * messages.length);
+    let randomMessage = messages[randomMessageIndex];
+    console.log(`sending: ${randomMessage.content} to ${channelToPost.name}`);
+
+    //Not required, but helps if there are multiple requests/message failure
+    channelToPost.stopTyping(true);
+    channelToPost.send(generateEmbed(randomMessage, sourceChannel));
+  }
 };
 
 const fetchAll = async (channel) => {
@@ -81,7 +134,7 @@ const fetchAll = async (channel) => {
   let messageArray = [];
   let lastID;
 
-  console.log("starting fetch, this could take a while!");
+  console.log(`starting ${channel.name} fetch, this could take a while!`);
   while (size === 100) {
     await channel.messages
       .fetch({ limit: size, before: lastID })
@@ -123,29 +176,36 @@ const sendHelp = (channel) => {
   channel.send(exampleEmbed);
 };
 
-function generateEmbed (message) {
+function generateEmbed(message, channel) {
+  console.log(message);
   let author = message.author;
+  console.log('======================')
+  console.log(author)
   const embed = new Discord.MessageEmbed()
-    .setColor('RANDOM')
-    .setTitle(`#${message.channel.name}`)
+    .setColor("RANDOM")
+    .setTitle(`#${channel.name}`)
     .setURL(message.url)
-    .setAuthor(author.username, message.author.avatarURL({dynamic:true}))
+    .setAuthor(author.username, message.author.avatarURL || message.author.avatarURL({ dynamic: true }))
     .setDescription(message.cleanContent)
     .setTimestamp(message.createdAt)
-    .setFooter('Sent on',
-      'https://media.discordapp.net/attachments/358274019482664961/607715919090810987/obamer_sphere.gif');
+    .setFooter(
+      "Sent on",
+      "https://media.discordapp.net/attachments/358274019482664961/607715919090810987/obamer_sphere.gif"
+    );
 
-    //Assume attachments have a higher priority
-    if (message.embeds.length > 0) {
-      var img = message.embeds.find(embed => embed.type === 'image');
-    }
-    if (message.attachments.size > 0){
-      var img = message.attachments.find(attach => attach.url.match(/\.(jpg|jpeg|gif|png|tiff|bmp)$/) != null);
-    }
-    if (img) {
-      embed.setImage(img.url);
-    }
-    return embed;
+  //Assume attachments have a higher priority
+  if (message.embeds.length > 0) {
+    var img = message.embeds.find((embed) => embed.type === "image");
+  }
+  if (message.attachments.size > 0) {
+    var img = message.attachments.find(
+      (attach) => attach.url.match(/\.(jpg|jpeg|gif|png|tiff|bmp)$/) != null
+    );
+  }
+  if (img) {
+    embed.setImage(img.url);
+  }
+  return embed;
 }
 
 client.login(process.env.TOKEN);
