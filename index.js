@@ -76,11 +76,14 @@ const downloadHistory = async (guild) => {
     file.on("error", function (err) {
       console.log(err);
     });
+    console.log(messageArray[0].createdAt)
     messageArray.forEach(function (message) {
+      
       let messageObj = JSON.parse(JSON.stringify(message));
       messageObj.author = message.author;
       messageObj.embeds = message.embeds;
       messageObj.attachments = message.attachments;
+      messageObj.createdAt = message.createdAt;
       file.write(JSON.stringify(messageObj) + "\n");
     });
     file.end();
@@ -177,10 +180,7 @@ const sendHelp = (channel) => {
 };
 
 function generateEmbed(message, channel) {
-  console.log(message);
   let author = message.author;
-  console.log('======================')
-  console.log(author)
   const embed = new Discord.MessageEmbed()
     .setColor("RANDOM")
     .setTitle(`#${channel.name}`)
