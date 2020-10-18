@@ -79,11 +79,15 @@ const downloadHistory = async (guild) => {
     console.log(messageArray[0].createdAt)
     messageArray.forEach(function (message) {
       
+      // Discord.js has some really weird overwrites for toString functionality,
+      // that loses deep properties on the object, so we have to set them
+      // explicitly
       let messageObj = JSON.parse(JSON.stringify(message));
       messageObj.author = message.author;
       messageObj.embeds = message.embeds;
       messageObj.attachments = message.attachments;
       messageObj.createdAt = message.createdAt;
+      messageObj.url = message.url;
       file.write(JSON.stringify(messageObj) + "\n");
     });
     file.end();
