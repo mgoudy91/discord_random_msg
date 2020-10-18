@@ -76,16 +76,14 @@ const downloadHistory = async (guild) => {
     file.on("error", function (err) {
       console.log(err);
     });
-    console.log(messageArray[0].createdAt)
     messageArray.forEach(function (message) {
-      
       // Discord.js has some really weird overwrites for toString functionality,
       // that loses deep properties on the object, so we have to set them
       // explicitly
       let messageObj = JSON.parse(JSON.stringify(message));
       messageObj.author = message.author;
-      messageObj.embeds = message.embeds;
-      messageObj.attachments = message.attachments;
+      messageObj.embeds = JSON.stringify(message.embeds);
+      messageObj.attachments = JSON.stringify(message.attachments);
       messageObj.createdAt = message.createdAt;
       messageObj.url = message.url;
       file.write(JSON.stringify(messageObj) + "\n");
@@ -110,10 +108,8 @@ const getRandomMessage = async (sourceChannel, channelToPost) => {
   // First choice: fetch from file
   if (fs.existsSync(fileName)) {
     console.log(`We have a file for ${sourceChannel.name}`);
-    let messages = fs.readFileSync(fileName).toString().split("\n");
-    console.log(`Picking message at random...`);
-    let randomMessageIndex = Math.floor(Math.random() * messages.length) -1;
-    console.log(`random is`+ randomMessageIndex);
+    let messages = fs.readFileSync(fileName).toString().trim().split("\n");
+    let randomMessageIndex = Math.floor(Math.random() * messages.length);
 
     // need to parse
     let randomMessage = JSON.parse(messages[randomMessageIndex]);
@@ -189,7 +185,10 @@ function generateEmbed(message, channel) {
     .setColor("RANDOM")
     .setTitle(`#${channel.name}`)
     .setURL(message.url)
-    .setAuthor(author.username, message.author.avatarURL || message.author.avatarURL({ dynamic: true }))
+    .setAuthor(
+      author.username,
+      message.author.avatarURL || message.author.avatarURL({ dynamic: true })
+    )
     .setDescription(message.cleanContent)
     .setTimestamp(message.createdAt)
     .setFooter(
@@ -198,11 +197,12 @@ function generateEmbed(message, channel) {
     );
 
   //Assume attachments have a higher priority
-  if (message.embeds.length > 0) {
-    var img = message.embeds.find((embed) => embed.type === "image");
+  let img;
+  if (message.embeds && message.embeds.length > 0) {
+    img = JSON.parse(message.embeds).find((embed) => embed.type === "image");
   }
-  if (message.attachments.size > 0) {
-    var img = message.attachments.find(
+  if (message.attachments && message.attachments.length > 0) {
+    img = JSON.parse(message.attachments).find(
       (attach) => attach.url.match(/\.(jpg|jpeg|gif|png|tiff|bmp)$/) != null
     );
   }
