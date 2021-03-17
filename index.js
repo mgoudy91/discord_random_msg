@@ -62,35 +62,39 @@ client.on("message", (message) => {
   }
 });
 
+const downloadChannelHistory = async (channel) => {
+  console.log("Indexing channel: " + channel.name);
+  let messageArray = await fetchAll(channel);
+  // Write to file
+  let file = fs.createWriteStream("./message_index/" + channel.name + ".txt");
+  file.on("error", function (err) {
+    console.log(err);
+  });
+  messageArray.forEach(function (message) {
+    // Discord.js has some really weird overwrites for toString functionality,
+    // that loses deep properties on the object, so we have to set them
+    // explicitly
+    let messageObj = JSON.parse(JSON.stringify(message));
+    messageObj.author = message.author;
+    messageObj.embeds = JSON.stringify(message.embeds);
+    messageObj.attachments = JSON.stringify(message.attachments);
+    messageObj.createdAt = message.createdAt;
+    messageObj.url = message.url;
+    file.write(JSON.stringify(messageObj) + "\n");
+  });
+ file.end();
+ console.log("done indexing: " + channel.name);
+
+ return messageArray;
+};
+
 const downloadHistory = async (guild) => {
   console.log("Start indexing");
   let channels = guild.channels.cache.filter(
     (channel) => channel.type === "text"
   );
   channels.forEach(async (channel) => {
-    console.log("indexing: " + channel.name);
-    let messageArray = await fetchAll(channel);
-
-    // Write to file
-    let file = fs.createWriteStream("./message_index/" + channel.name + ".txt");
-    file.on("error", function (err) {
-      console.log(err);
-    });
-    messageArray.forEach(function (message) {
-      // Discord.js has some really weird overwrites for toString functionality,
-      // that loses deep properties on the object, so we have to set them
-      // explicitly
-      let messageObj = JSON.parse(JSON.stringify(message));
-      messageObj.author = message.author;
-      messageObj.embeds = JSON.stringify(message.embeds);
-      messageObj.attachments = JSON.stringify(message.attachments);
-      messageObj.createdAt = message.createdAt;
-      messageObj.url = message.url;
-      file.write(JSON.stringify(messageObj) + "\n");
-    });
-    file.end();
-
-    console.log("done indexing: " + channel.name);
+    downloadChannelHistory(channel);
   });
 };
 
@@ -104,6 +108,7 @@ const getRandomMessage = async (sourceChannel, channelToPost) => {
   channelToPost.startTyping();
 
   let fileName = `./message_index/${sourceChannel.name}.txt`;
+  let randomMessage;
 
   // First choice: fetch from file
   if (fs.existsSync(fileName)) {
@@ -112,25 +117,23 @@ const getRandomMessage = async (sourceChannel, channelToPost) => {
     let randomMessageIndex = Math.floor(Math.random() * messages.length);
 
     // need to parse
-    let randomMessage = JSON.parse(messages[randomMessageIndex]);
-    console.log(`sending: ${randomMessage.content} to ${channelToPost.name}`);
+    randomMessage = JSON.parse(messages[randomMessageIndex]);
 
-    //Not required, but helps if there are multiple requests/message failure
-    channelToPost.stopTyping(true);
-    channelToPost.send(generateEmbed(randomMessage, sourceChannel));
   } else {
-    // Fallback, fetch now
-    let messages = await fetchAll(sourceChannel);
+    // Fallback, fetch and index now
+    console.log("No index file found for ${sourceChannel.name}");
+    let messages = await downloadChannelHistory(sourceChannel);
+
     console.log(`Picking message at random...`);
     let randomMessageIndex = Math.floor(Math.random() * messages.length);
-    let randomMessage = messages[randomMessageIndex];
-    console.log(`sending: ${randomMessage.content} to ${channelToPost.name}`);
+    randomMessage = messages[randomMessageIndex]; }
 
-    //Not required, but helps if there are multiple requests/message failure
-    channelToPost.stopTyping(true);
-    channelToPost.send(generateEmbed(randomMessage, sourceChannel));
-  }
+  console.log(`sending: ${randomMessage.content} to ${channelToPost.name}`);
+  //Not required, but helps if there are multiple requests/message failure
+  channelToPost.stopTyping(true);
+  channelToPost.send(generateEmbed(randomMessage, sourceChannel));
 };
+
 
 const fetchAll = async (channel) => {
   let size = 100;
@@ -142,7 +145,7 @@ const fetchAll = async (channel) => {
     await channel.messages
       .fetch({ limit: size, before: lastID })
       .then((messages) => {
-        console.log(`${messages.size} messages fetched`);
+        console.log(`Fetching ${messages.size} messages from ${channel.name}`);
         messages.each((message) => {
           messageArray.push(message);
         });
@@ -153,7 +156,7 @@ const fetchAll = async (channel) => {
     lastID = messageArray[messageArray.length - 1].id;
   }
 
-  console.log(`Fetch complete! ${messageArray.length} messages found`);
+  console.log(`Fetch complete! ${messageArray.length} messages found in ${channel.name}`);
 
   return messageArray;
 };
