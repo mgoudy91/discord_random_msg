@@ -1,3 +1,3 @@
 web=0
 worker=1
-worker: yarn start
+worker: npm run start
