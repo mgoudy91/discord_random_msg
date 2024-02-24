@@ -196,18 +196,26 @@ function generateEmbed(message, channel) {
     .setTimestamp(message.createdAt)
     .setFooter(
       "Sent on",
-      "https://media.discordapp.net/attachments/358274019482664961/607715919090810987/obamer_sphere.gif"
+      "https://media.tenor.com/YNwyN6nZ1jcAAAAi/barack-obama-sphere.gif"
     );
 
   //Assume attachments have a higher priority
   let img;
   if (message.embeds && message.embeds.length > 0) {
-    img = JSON.parse(message.embeds).find((embed) => embed.type === "image");
+    try {
+      img = JSON.parse(message.embeds).find((embed) => embed.type === "image");
+    } catch (e) {
+      console.log(e);
+    }
   }
   if (message.attachments && message.attachments.length > 0) {
-    img = JSON.parse(message.attachments).find(
-      (attach) => attach.url.match(/\.(jpg|jpeg|gif|png|tiff|bmp)$/) != null
-    );
+    try {
+      img = JSON.parse(message.attachments).find(
+        (attach) => attach.url.match(/\.(jpg|jpeg|gif|png|tiff|bmp)$/) != null
+      );
+    } catch (e) {
+      console.log(e);
+    }
   }
   if (img) {
     embed.setImage(img.url);
