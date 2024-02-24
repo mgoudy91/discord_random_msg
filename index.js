@@ -1,8 +1,21 @@
 "use strict";
 require("dotenv").config();
+const express = require('express');
+const app = express();
 const Discord = require("discord.js");
 const fs = require("fs");
+
 const client = new Discord.Client();
+const port = process.env.PORT || 3000; // Fallback for local development
+
+
+// Heroku requires a web server respond to GET requests to keep the app running
+app.get('/', (req, res) => {
+  res.send('Discord Bot is running!');
+});
+app.listen(port, () => {
+  console.log(`Web server is listening on port ${port}`);
+});
 
 client.on("ready", () => {
   console.log("Ready for action!");
