@@ -228,7 +228,7 @@ function generateEmbed(message: Message, channel: TextChannel) {
     .setURL(message.url)
     .setAuthor(
       author.username,
-      message.author.avatarURL({ format: 'png', dynamic: true }) || undefined
+      message.author.displayAvatarURL({ format: 'png', dynamic: true })
     )
     .setDescription(message.cleanContent)
     .setTimestamp(message.createdAt)
