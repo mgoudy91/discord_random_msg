@@ -1,16 +1,21 @@
-
-require("dotenv").config();
-const app = express();
-import { Channel, Client, Collection, Guild, GuildChannel, Message, MessageEmbed, TextChannel } from "discord.js";
-import * as fs from "fs";
+require('dotenv').config();
+import {
+  Client,
+  Collection,
+  Guild,
+  GuildChannel,
+  Message,
+  MessageEmbed,
+  TextChannel,
+} from 'discord.js';
+import * as fs from 'fs';
 
 const client = new Client();
 const port = process.env.PORT || 3000; // Fallback for local development
 
-
 // Heroku requires a web server respond to GET requests to keep the app running
 import express, { Request, Response } from 'express';
-
+const app = express();
 
 app.get('/', (req: Request, res: Response) => {
   res.send('Discord Bot is running!');
@@ -20,14 +25,13 @@ app.listen(port, () => {
   console.log(`Web server is listening on port ${port}`);
 });
 
-client.on("ready", () => {
-  console.log("Ready for action!");
+client.on('ready', () => {
+  console.log('Ready for action!');
   //very important
 });
 
 // Create an event listener for messages
-client.on("message", (message: Message) => {
-
+client.on('message', (message: Message) => {
   // Filter messages to get an entry point
   if (message.author.bot) {
     return;
@@ -38,26 +42,26 @@ client.on("message", (message: Message) => {
   }
 
   if (
-    message.content.includes("!random_message") ||
-    message.content.includes("!rm")
+    message.content.includes('!random_message') ||
+    message.content.includes('!rm')
   ) {
-    let command = message.content.includes("!random_message")
-      ? "!random_message"
-      : "!rm";
+    let command = message.content.includes('!random_message')
+      ? '!random_message'
+      : '!rm';
 
     // Get args
     let commandArray = message.content
       .substring(message.content.indexOf(command))
-      .split(" ");
+      .split(' ');
 
     // Break for help
-    if (commandArray.some((command) => command.includes("help"))) {
+    if (commandArray.some((command) => command.includes('help'))) {
       sendHelp(message.channel as TextChannel);
       return;
     }
 
     // Break for indexing
-    if (commandArray.some((command) => command.includes("index"))) {
+    if (commandArray.some((command) => command.includes('index'))) {
       downloadHistory(message.guild);
       return;
     }
@@ -65,30 +69,34 @@ client.on("message", (message: Message) => {
     // Parse args
     let channelName;
     commandArray.forEach((command) => {
-      if (command.indexOf("c:") !== -1) {
-        channelName = command.split("c:")[1];
+      if (command.indexOf('c:') !== -1) {
+        channelName = command.split('c:')[1];
       }
     });
 
-    let channels: TextChannel[] = getChannels(message.guild, channelName).array();
+    let channels: TextChannel[] = getChannels(
+      message.guild,
+      channelName
+    ).array();
 
     if (!channels || !channels.length) {
-      message.channel.send("`Invalid channel filter` try `!rm help`");
+      message.channel.send('`Invalid channel filter` try `!rm help`');
       return;
     }
 
-    let randomChannel: TextChannel = channels[Math.floor(Math.random() * channels.length)];
+    let randomChannel: TextChannel =
+      channels[Math.floor(Math.random() * channels.length)];
     console.log(`fetching rand msg from ${randomChannel.name}`);
     getRandomMessage(randomChannel, message.channel as TextChannel);
   }
 });
 
 const downloadChannelHistory = async (channel: GuildChannel) => {
-  console.log("Indexing channel: " + channel.name);
+  console.log('Indexing channel: ' + channel.name);
   let messageArray = await fetchAll(channel);
   // Write to file
-  let file = fs.createWriteStream("./message_index/" + channel.name + ".txt");
-  file.on("error", function (err) {
+  let file = fs.createWriteStream('./message_index/' + channel.name + '.txt');
+  file.on('error', function (err) {
     console.log(err);
   });
   messageArray.forEach(function (message) {
@@ -101,33 +109,39 @@ const downloadChannelHistory = async (channel: GuildChannel) => {
     messageObj.attachments = JSON.stringify(message.attachments);
     messageObj.createdAt = message.createdAt;
     messageObj.url = message.url;
-    file.write(JSON.stringify(messageObj) + "\n");
+    file.write(JSON.stringify(messageObj) + '\n');
   });
   file.end();
-  console.log("done indexing: " + channel.name);
+  console.log('done indexing: ' + channel.name);
 
   return messageArray;
 };
 
 const downloadHistory = async (guild: Guild) => {
-  console.log("Start indexing");
+  console.log('Start indexing');
   let channels = guild.channels.cache.filter(
-    (channel) => channel.type === "text"
+    (channel) => channel.type === 'text'
   );
   channels.forEach(async (channel) => {
     downloadChannelHistory(channel);
   });
 };
 
-const getChannels = (guild: Guild, channelName: string = ""): Collection<string, TextChannel> => {
+const getChannels = (
+  guild: Guild,
+  channelName: string = ''
+): Collection<string, TextChannel> => {
   const channels = guild.channels.cache.filter(
-    (channel) => channel.type === "text" && channel.name.includes(channelName)
+    (channel) => channel.type === 'text' && channel.name.includes(channelName)
   );
   // filter out any non TextChannels
   return channels as Collection<string, TextChannel>;
 };
 
-const getRandomMessage = async (sourceChannel: TextChannel, channelToPost: TextChannel) => {
+const getRandomMessage = async (
+  sourceChannel: TextChannel,
+  channelToPost: TextChannel
+) => {
   (channelToPost as TextChannel).startTyping();
 
   let fileName = `./message_index/${sourceChannel.name}.txt`;
@@ -136,15 +150,14 @@ const getRandomMessage = async (sourceChannel: TextChannel, channelToPost: TextC
   // First choice: fetch from file
   if (fs.existsSync(fileName)) {
     console.log(`We have a file for ${sourceChannel.name}`);
-    let messages = fs.readFileSync(fileName).toString().trim().split("\n");
+    let messages = fs.readFileSync(fileName).toString().trim().split('\n');
     let randomMessageIndex = Math.floor(Math.random() * messages.length);
 
     // need to parse
     randomMessage = JSON.parse(messages[randomMessageIndex]);
-
   } else {
     // Fallback, fetch and index now
-    console.log("No index file found for ${sourceChannel.name}");
+    console.log('No index file found for ${sourceChannel.name}');
     let messages = await downloadChannelHistory(sourceChannel);
 
     console.log(`Picking message at random...`);
@@ -157,7 +170,6 @@ const getRandomMessage = async (sourceChannel: TextChannel, channelToPost: TextC
   channelToPost.stopTyping(true);
   channelToPost.send(generateEmbed(randomMessage, sourceChannel));
 };
-
 
 const fetchAll = async (channel: GuildChannel) => {
   let size = 100;
@@ -180,30 +192,30 @@ const fetchAll = async (channel: GuildChannel) => {
     lastID = messageArray[messageArray.length - 1].id;
   }
 
-  console.log(`Fetch complete! ${messageArray.length} messages found in ${channel.name}`);
+  console.log(
+    `Fetch complete! ${messageArray.length} messages found in ${channel.name}`
+  );
 
   return messageArray;
 };
 
 const sendHelp = (channel: TextChannel) => {
-
-
   const exampleEmbed = new MessageEmbed()
-    .setColor("#0099ff")
-    .setTitle("HistoryBot")
+    .setColor('#0099ff')
+    .setTitle('HistoryBot')
     .setAuthor(
-      "History Bot",
-      "https://media.discordapp.net/attachments/358274019482664961/607715919090810987/obamer_sphere.gif",
-      "https://github.com/mgoudy91/discord_random_msg"
+      'History Bot',
+      'https://media.discordapp.net/attachments/358274019482664961/607715919090810987/obamer_sphere.gif',
+      'https://github.com/mgoudy91/discord_random_msg'
     )
     .setDescription("Send a random message from your server's history")
     .addFields(
-      { name: "Basic Usage", value: "`!rm` or `!random_message`" },
-      { name: "Specify channel", value: "`!rm c:channel_name`", inline: true },
-      { name: "Get help", value: "`!rm help`", inline: true }
+      { name: 'Basic Usage', value: '`!rm` or `!random_message`' },
+      { name: 'Specify channel', value: '`!rm c:channel_name`', inline: true },
+      { name: 'Get help', value: '`!rm help`', inline: true }
     )
     .setTimestamp()
-    .setFooter("Created with extreme malice");
+    .setFooter('Created with extreme malice');
 
   channel.send(exampleEmbed);
 };
@@ -211,25 +223,27 @@ const sendHelp = (channel: TextChannel) => {
 function generateEmbed(message: Message, channel: TextChannel) {
   let author = message.author;
   const embed = new MessageEmbed()
-    .setColor("RANDOM")
+    .setColor('RANDOM')
     .setTitle(`#${channel.name}`)
     .setURL(message.url)
     .setAuthor(
       author.username,
-      message.author.avatarURL({ format: "png", dynamic: true }) || undefined
+      message.author.avatarURL({ format: 'png', dynamic: true }) || undefined
     )
     .setDescription(message.cleanContent)
     .setTimestamp(message.createdAt)
     .setFooter(
-      "Sent on",
-      "https://media.tenor.com/YNwyN6nZ1jcAAAAi/barack-obama-sphere.gif"
+      'Sent on',
+      'https://media.tenor.com/YNwyN6nZ1jcAAAAi/barack-obama-sphere.gif'
     );
 
   //Assume attachments have a higher priority
   let img;
   if (message.embeds && message.embeds.length > 0) {
     try {
-      img = message.embeds.find((embed: MessageEmbed) => embed.type === "image");
+      img = message.embeds.find(
+        (embed: MessageEmbed) => embed.type === 'image'
+      );
     } catch (e) {
       console.log(e);
     }
