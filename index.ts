@@ -14,7 +14,7 @@ const client = new Client();
 const port = process.env.PORT || 3000; // Fallback for local development
 
 // Heroku requires a web server respond to GET requests to keep the app running
-import express, { Request, Response } from 'express';
+import express, { Request, Response, raw } from 'express';
 const app = express();
 
 app.get('/', (req: Request, res: Response) => {
@@ -145,24 +145,44 @@ const getRandomMessage = async (
   (channelToPost as TextChannel).startTyping();
 
   let fileName = `./message_index/${sourceChannel.name}.txt`;
+  let messages: Message[];
   let randomMessage;
 
   // First choice: fetch from file
   if (fs.existsSync(fileName)) {
     console.log(`We have a file for ${sourceChannel.name}`);
-    let messages = fs.readFileSync(fileName).toString().trim().split('\n');
-    let randomMessageIndex = Math.floor(Math.random() * messages.length);
 
-    // need to parse
-    randomMessage = JSON.parse(messages[randomMessageIndex]);
+    let rawLines = fs
+      .readFileSync(fileName, 'utf-8')
+      .split('\n')
+      .filter((line) => line.length > 0);
+
+    let rawMessages = rawLines.map((line) => {
+      return JSON.parse(line);
+    });
+
+    // convert messages in to Message objects
+    messages = rawMessages.map((rawMessage) => {
+      rawMessage.embeds = JSON.parse(rawMessage.embeds);
+      let message = new Message(
+        sourceChannel.client,
+        rawMessage,
+        sourceChannel
+      );
+      return message;
+    });
   } else {
     // Fallback, fetch and index now
     console.log('No index file found for ${sourceChannel.name}');
-    let messages = await downloadChannelHistory(sourceChannel);
+    messages = await downloadChannelHistory(sourceChannel);
+  }
+  console.log(`Picking message at random...`);
+  let randomMessageIndex = Math.floor(Math.random() * messages.length);
+  randomMessage = messages[randomMessageIndex];
 
-    console.log(`Picking message at random...`);
-    let randomMessageIndex = Math.floor(Math.random() * messages.length);
-    randomMessage = messages[randomMessageIndex];
+  if (!randomMessage) {
+    console.log('No random message found');
+    return;
   }
 
   console.log(`sending: ${randomMessage.content} to ${channelToPost.name}`);
@@ -222,13 +242,14 @@ const sendHelp = (channel: TextChannel) => {
 
 function generateEmbed(message: Message, channel: TextChannel) {
   let author = message.author;
+  console.log(author);
   const embed = new MessageEmbed()
     .setColor('RANDOM')
     .setTitle(`#${channel.name}`)
     .setURL(message.url)
     .setAuthor(
       author.username,
-      message.author.displayAvatarURL({ format: 'png', dynamic: true })
+      author.displayAvatarURL({ format: 'png', dynamic: true })
     )
     .setDescription(message.cleanContent)
     .setTimestamp(message.createdAt)
@@ -238,23 +259,31 @@ function generateEmbed(message: Message, channel: TextChannel) {
     );
 
   //Assume attachments have a higher priority
-  let img;
+  // let img;
+  console.log('message.embeds and message.attachments');
+  console.log(message.embeds);
+  console.log(message.attachments);
   if (message.embeds && message.embeds.length > 0) {
+    console.log('trying to generate embed from embeds');
     try {
-      img = message.embeds.find(
+      let img = message.embeds.find(
         (embed: MessageEmbed) => embed.type === 'image'
       );
+      if (img && img.url) {
+        embed.setImage(img.url);
+        return embed;
+      }
     } catch (e) {
       console.log(e);
     }
-  }
-  if (message.attachments && message.attachments.size > 0) {
-    img = message.attachments.find(
-      (attach) => attach.url.match(/\.(jpg|jpeg|gif|png|tiff|bmp)$/) != null
-    );
-  }
-  if (img && img.url) {
-    embed.setImage(img.url);
+  } else if (message.attachments && message.attachments.size > 0) {
+    console.log('trying to generate embed from attachments');
+    // Get first item in message.attachments that has a url field
+    let img = message.attachments.find((attachment) => !!attachment.url.length);
+    if (img && img.url) {
+      embed.setImage(img.url);
+    }
+    return embed;
   }
   return embed;
 }
